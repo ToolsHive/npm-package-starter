@@ -1,0 +1,31 @@
+{
+  "name": "@toolshive/npm-package-starter",
+  "version": "0.0.0",
+  "description": "A CLI tool for creating starter templates for npm packages using TypeScript or JavaScript, tailored to simplify package development.",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "npm-package-starter": "./dist/index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "npm",
+    "typescript",
+    "javascript",
+    "starter-template",
+    "cli"
+  ],
+  "author": "Armoghan-ul-Mohmin",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ToolsHive/npm-package-starter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ToolsHive/npm-package-starter/issues"
+  },
+  "homepage": "https://github.com/ToolsHive/npm-package-starter#readme"
+}
