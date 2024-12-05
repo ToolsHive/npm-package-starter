@@ -1,0 +1,184 @@
+name: Node.js Package Test 🎉
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [21.x]
+
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - name: 📦 Install dependencies
+        run: npm install
+
+      - name: 🚀 Build the project
+        run: npm run build
+
+      - name: 🏗️ Ensure main entry (dist/index.js) runs without errors
+        id: main_entry
+        run: |
+          node dist/index.js
+
+      - name: 🏗️ Ensure module entry (dist/index.mjs) runs without errors
+        id: module_entry
+        run: |
+          node --experimental-modules dist/index.mjs
+
+      - name: 🔄 Check for outdated dependencies
+        id: outdated_deps
+        run: |
+          npm outdated > outdated.txt || true
+        continue-on-error: true
+
+      - name: 🔒 Check for security risks
+        id: audit
+        run: npm audit --production --json > audit-result.json
+        continue-on-error: true
+
+      - name: 📣 Send Slack Message - Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
+          WORKFLOW_NAME="${{ github.workflow }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          COMMIT_AUTHOR="${{ github.actor }}"
+          COMMIT_DATE="${{ github.event.head_commit.timestamp }}"
+          JOB_STATUS="${{ job.status }}"
+          PASSED_TESTS=$(grep -o "✓" test-result.log | wc -l)
+          FAILED_TESTS=$(grep -o "✗" test-result.log | wc -l)
+          TOTAL_TESTS=$(($PASSED_TESTS + $FAILED_TESTS))
+          SUCCESS_PERCENTAGE=$(echo "scale=2; ($PASSED_TESTS / $TOTAL_TESTS) * 100" | bc)
+          DURATION=$(($SECONDS / 60))
+          FAILED_LOGS=$(grep "✗" test-result.log || echo "No failed tests found.")
+          OUTDATED_DEPS=$(cat outdated.txt || echo "No outdated dependencies detected.")
+          SECURITY_AUDIT=$(cat audit-result.json | jq -r '.advisories | to_entries | map("*\(.value.module_name)*: \(.value.severity), \(.value.title) - \(.value.url)") | join("\n")' || echo "No vulnerabilities found.")
+          
+          SLACK_MESSAGE="*🚀 Workflow Summary: ${WORKFLOW_NAME}*"
+          SLACK_MESSAGE+="*📅 Commit Details:*\n> Commit Message: ${COMMIT_MESSAGE}\n> Commit Author: ${COMMIT_AUTHOR}\n> Commit Date: ${COMMIT_DATE}\n"
+          SLACK_MESSAGE+="*⏳ Build Duration:*\n> The job took ${DURATION} minutes to complete."
+          SLACK_MESSAGE+="*✨ Next Steps:*\n> If successful, proceed with merging changes. Otherwise, review logs."
+          
+          if [[ "${JOB_STATUS}" == "success" ]]; then
+            SLACK_MESSAGE+="\n*🧪 Test Results:*\n> Total Tests: ${TOTAL_TESTS}\n> Passed: ${PASSED_TESTS}\n> Failed: ${FAILED_TESTS}\n> Success Rate: ${SUCCESS_PERCENTAGE}%"
+            SLACK_MESSAGE+="\n*🔄 Outdated Dependencies:*\n> ${OUTDATED_DEPS}"
+            SLACK_MESSAGE+="\n*🔒 Security Audit Results:*\n> ${SECURITY_AUDIT}"
+            SLACK_MESSAGE+="\n*🔗 Full Workflow Details:* \n> *[View Workflow Run](${RUN_URL})*\n*🌟 Status: Success* 🎉"
+          elif [[ "${JOB_STATUS}" == "failure" ]]; then
+            SLACK_MESSAGE+="\n*⚠️ Failed Logs (if any):*\n> ${FAILED_LOGS}"
+            SLACK_MESSAGE+="\n*🔄 Outdated Dependencies:*\n> ${OUTDATED_DEPS}"
+            SLACK_MESSAGE+="\n*🔒 Security Audit Results:*\n> ${SECURITY_AUDIT}"
+            SLACK_MESSAGE+="\n*🔗 Full Workflow Details:* \n> *[View Workflow Run](${RUN_URL})*\n*🌟 Status: Failed* 😞"
+          else
+            SLACK_MESSAGE+="\n*⚠️ Unexpected Error:*\n> Something went wrong. Please investigate manually."
+          fi
+          
+          curl -X POST --data-urlencode "payload={ 
+            \"channel\": \"#proj-npm-package-starter\", 
+            \"username\": \"GitHub Actions Bot\", 
+            \"text\": \"$SLACK_MESSAGE\", 
+            \"icon_emoji\": \":robot_face:\"
+          }" ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: 📣 Send Slack Message - Windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
+          WORKFLOW_NAME="${{ github.workflow }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          COMMIT_AUTHOR="${{ github.actor }}"
+          COMMIT_DATE="${{ github.event.head_commit.timestamp }}"
+          JOB_STATUS="${{ job.status }}"
+          PASSED_TESTS=$(grep -o "✓" test-result.log | wc -l)
+          FAILED_TESTS=$(grep -o "✗" test-result.log | wc -l)
+          TOTAL_TESTS=$(($PASSED_TESTS + $FAILED_TESTS))
+          SUCCESS_PERCENTAGE=$(echo "scale=2; ($PASSED_TESTS / $TOTAL_TESTS) * 100" | bc)
+          DURATION=$(($SECONDS / 60))
+          FAILED_LOGS=$(grep "✗" test-result.log || echo "No failed tests found.")
+          OUTDATED_DEPS=$(cat outdated.txt || echo "No outdated dependencies detected.")
+          SECURITY_AUDIT=$(cat audit-result.json | jq -r '.advisories | to_entries | map("*\(.value.module_name)*: \(.value.severity), \(.value.title) - \(.value.url)") | join("\n")' || echo "No vulnerabilities found.")
+          
+          SLACK_MESSAGE="*🚀 Workflow Summary: ${WORKFLOW_NAME}*"
+          SLACK_MESSAGE+="*📅 Commit Details:*\n> Commit Message: ${COMMIT_MESSAGE}\n> Commit Author: ${COMMIT_AUTHOR}\n> Commit Date: ${COMMIT_DATE}\n"
+          SLACK_MESSAGE+="*⏳ Build Duration:*\n> The job took ${DURATION} minutes to complete."
+          SLACK_MESSAGE+="*✨ Next Steps:*\n> If successful, proceed with merging changes. Otherwise, review logs."
+          
+          if [[ "${JOB_STATUS}" == "success" ]]; then
+            SLACK_MESSAGE+="\n*🧪 Test Results:*\n> Total Tests: ${TOTAL_TESTS}\n> Passed: ${PASSED_TESTS}\n> Failed: ${FAILED_TESTS}\n> Success Rate: ${SUCCESS_PERCENTAGE}%"
+            SLACK_MESSAGE+="\n*🔄 Outdated Dependencies:*\n> ${OUTDATED_DEPS}"
+            SLACK_MESSAGE+="\n*🔒 Security Audit Results:*\n> ${SECURITY_AUDIT}"
+            SLACK_MESSAGE+="\n*🔗 Full Workflow Details:* \n> *[View Workflow Run](${RUN_URL})*\n*🌟 Status: Success* 🎉"
+          elif [[ "${JOB_STATUS}" == "failure" ]]; then
+            SLACK_MESSAGE+="\n*⚠️ Failed Logs (if any):*\n> ${FAILED_LOGS}"
+            SLACK_MESSAGE+="\n*🔄 Outdated Dependencies:*\n> ${OUTDATED_DEPS}"
+            SLACK_MESSAGE+="\n*🔒 Security Audit Results:*\n> ${SECURITY_AUDIT}"
+            SLACK_MESSAGE+="\n*🔗 Full Workflow Details:* \n> *[View Workflow Run](${RUN_URL})*\n*🌟 Status: Failed* 😞"
+          else
+            SLACK_MESSAGE+="\n*⚠️ Unexpected Error:*\n> Something went wrong. Please investigate manually."
+          fi
+          
+          curl -X POST --data-urlencode "payload={ 
+            \"channel\": \"#proj-npm-package-starter\", 
+            \"username\": \"GitHub Actions Bot\", 
+            \"text\": \"$SLACK_MESSAGE\", 
+            \"icon_emoji\": \":robot_face:\"
+          }" ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: 📣 Send Slack Message - macOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
+          WORKFLOW_NAME="${{ github.workflow }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          COMMIT_AUTHOR="${{ github.actor }}"
+          COMMIT_DATE="${{ github.event.head_commit.timestamp }}"
+          JOB_STATUS="${{ job.status }}"
+          PASSED_TESTS=$(grep -o "✓" test-result.log | wc -l)
+          FAILED_TESTS=$(grep -o "✗" test-result.log | wc -l)
+          TOTAL_TESTS=$(($PASSED_TESTS + $FAILED_TESTS))
+          SUCCESS_PERCENTAGE=$(echo "scale=2; ($PASSED_TESTS / $TOTAL_TESTS) * 100" | bc)
+          DURATION=$(($SECONDS / 60))
+          FAILED_LOGS=$(grep "✗" test-result.log || echo "No failed tests found.")
+          OUTDATED_DEPS=$(cat outdated.txt || echo "No outdated dependencies detected.")
+          SECURITY_AUDIT=$(cat audit-result.json | jq -r '.advisories | to_entries | map("*\(.value.module_name)*: \(.value.severity), \(.value.title) - \(.value.url)") | join("\n")' || echo "No vulnerabilities found.")
+          
+          SLACK_MESSAGE="*🚀 Workflow Summary: ${WORKFLOW_NAME}*"
+          SLACK_MESSAGE+="*📅 Commit Details:*\n> Commit Message: ${COMMIT_MESSAGE}\n> Commit Author: ${COMMIT_AUTHOR}\n> Commit Date: ${COMMIT_DATE}\n"
+          SLACK_MESSAGE+="*⏳ Build Duration:*\n> The job took ${DURATION} minutes to complete."
+          SLACK_MESSAGE+="*✨ Next Steps:*\n> If successful, proceed with merging changes. Otherwise, review logs."
+          
+          if [[ "${JOB_STATUS}" == "success" ]]; then
+            SLACK_MESSAGE+="\n*🧪 Test Results:*\n> Total Tests: ${TOTAL_TESTS}\n> Passed: ${PASSED_TESTS}\n> Failed: ${FAILED_TESTS}\n> Success Rate: ${SUCCESS_PERCENTAGE}%"
+            SLACK_MESSAGE+="\n*🔄 Outdated Dependencies:*\n> ${OUTDATED_DEPS}"
+            SLACK_MESSAGE+="\n*🔒 Security Audit Results:*\n> ${SECURITY_AUDIT}"
+            SLACK_MESSAGE+="\n*🔗 Full Workflow Details:* \n> *[View Workflow Run](${RUN_URL})*\n*🌟 Status: Success* 🎉"
+          elif [[ "${JOB_STATUS}" == "failure" ]]; then
+            SLACK_MESSAGE+="\n*⚠️ Failed Logs (if any):*\n> ${FAILED_LOGS}"
+            SLACK_MESSAGE+="\n*🔄 Outdated Dependencies:*\n> ${OUTDATED_DEPS}"
+            SLACK_MESSAGE+="\n*🔒 Security Audit Results:*\n> ${SECURITY_AUDIT}"
+            SLACK_MESSAGE+="\n*🔗 Full Workflow Details:* \n> *[View Workflow Run](${RUN_URL})*\n*🌟 Status: Failed* 😞"
+          else
+            SLACK_MESSAGE+="\n*⚠️ Unexpected Error:*\n> Something went wrong. Please investigate manually."
+          fi
+          
+          curl -X POST --data-urlencode "payload={ 
+            \"channel\": \"#proj-npm-package-starter\", 
+            \"username\": \"GitHub Actions Bot\", 
+            \"text\": \"$SLACK_MESSAGE\", 
+            \"icon_emoji\": \":robot_face:\"
+          }" ${{ secrets.SLACK_WEBHOOK_URL }}
